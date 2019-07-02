@@ -195,6 +195,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 break;
         }
 
+        /**
+         * 发送一次心跳到所有broker
+         */
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
     }
 
@@ -481,7 +484,15 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         final SendCallback sendCallback,
         final long timeout
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+
+        /**
+         * 确保状态时OK的
+         */
         this.makeSureStateOK();
+
+        /**
+         * 检查消息
+         */
         Validators.checkMessage(msg, this.defaultMQProducer);
 
         final long invokeID = random.nextLong();
@@ -497,13 +508,18 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             MessageQueue mq = null;
             Exception exception = null;
             SendResult sendResult = null;
+            /**
+             * 异步只发送1次; 同步会重试retryTimesWhenSendFailed+1=3次
+             */
             int timesTotal = communicationMode == CommunicationMode.SYNC ? 1 + this.defaultMQProducer.getRetryTimesWhenSendFailed() : 1;
             int times = 0;
             String[] brokersSent = new String[timesTotal];
             for (; times < timesTotal; times++) {
                 String lastBrokerName = null == mq ? null : mq.getBrokerName();
                 /**
-                 *
+                 * 选择一个消息队列
+                 * 会根据当前延迟，设置某个broker不可用时间（后面的updateFaultItem方法）。
+                 * 延迟多少，多长时间这个broker不可用，时间对应关系在MQFaultStrategy.java类中
                  */
                 MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName);
                 if (mqSelected != null) {
@@ -713,6 +729,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     this.executeSendMessageHookBefore(context);
                 }
 
+                /**
+                 * 组装请求头
+                 */
                 SendMessageRequestHeader requestHeader = new SendMessageRequestHeader();
                 requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());
                 requestHeader.setTopic(msg.getTopic());
@@ -743,6 +762,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 SendResult sendResult = null;
                 switch (communicationMode) {
                     case ASYNC:
+                        /**
+                         * 异步消息处理
+                         */
                         Message tmpMessage = msg;
                         if (msgBodyCompressed) {
                             //If msg body was compressed, msgbody should be reset using prevBody.
@@ -771,6 +793,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         break;
                     case ONEWAY:
                     case SYNC:
+                        /**
+                         * 同步消息处理
+                         */
                         long costTimeSync = System.currentTimeMillis() - beginStartTime;
                         if (timeout < costTimeSync) {
                             throw new RemotingTooMuchRequestException("sendKernelImpl call timeout");
@@ -1237,6 +1262,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     public SendResult send(Message msg,
         long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        /**
+         * SYNC-同步发送
+         */
         return this.sendDefaultImpl(msg, CommunicationMode.SYNC, null, timeout);
     }
 
