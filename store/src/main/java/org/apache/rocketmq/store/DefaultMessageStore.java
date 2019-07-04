@@ -1748,6 +1748,11 @@ public class DefaultMessageStore implements MessageStore {
                     break;
                 }
 
+                /**
+                 * 主要是构建ConsumeQueue和Index
+                 * reputFromOffset：构建过ConsumeQueue/Index的进度
+                 * Result存储的是一家刷过盘的CommitLog的进度减去reputFromOffset，就是可以构建ConsumeQueue/Index的Message
+                 */
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
@@ -1760,6 +1765,9 @@ public class DefaultMessageStore implements MessageStore {
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    /**
+                                     * 构建消费队列
+                                     */
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
